@@ -1,0 +1,6 @@
+.git
+frontend/node_modules
+backend/api-server.exe
+backend/api-server-local.exe
+backend/data
+*.log

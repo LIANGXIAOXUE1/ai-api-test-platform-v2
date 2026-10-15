@@ -1,0 +1,141 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "本地接口演示项目",
+      "summary": "用于演示 Agent 生成请求、真实执行和回归对比",
+      "createdAt": "2026-10-13T15:58:35.8102933+08:00"
+    }
+  ],
+  "apis": [
+    {
+      "id": 1,
+      "projectId": 1,
+      "name": "回声接口 / Echo",
+      "method": "POST",
+      "url": "/api/demo/echo",
+      "kind": "REST",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "query": {},
+      "body": "{\"message\":\"hello from api tester\"}",
+      "enabled": true
+    },
+    {
+      "id": 2,
+      "projectId": 1,
+      "name": "需要鉴权的接口 / Auth",
+      "method": "GET",
+      "url": "/api/demo/auth",
+      "kind": "REST",
+      "headers": {},
+      "query": {},
+      "body": "",
+      "enabled": true
+    },
+    {
+      "id": 3,
+      "projectId": 1,
+      "name": "模型流式演示 / SSE",
+      "method": "POST",
+      "url": "/api/demo/llm",
+      "kind": "LLM",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "query": {
+        "stream": "true"
+      },
+      "body": "{\"question\":\"什么是 API 回归测试？\"}",
+      "enabled": true
+    }
+  ],
+  "testCases": [
+    {
+      "id": 1,
+      "projectId": 1,
+      "apiId": 1,
+      "name": "冒烟测试",
+      "prompt": "",
+      "request": {
+        "method": "POST",
+        "url": "/api/demo/echo",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "query": {},
+        "body": "{\"message\":\"smoke\"}"
+      },
+      "assertions": [
+        {
+          "type": "status",
+          "path": "",
+          "expected": "200"
+        },
+        {
+          "type": "json_field",
+          "path": "message",
+          "expected": "存在"
+        }
+      ],
+      "createdAt": "2026-10-13T15:58:45.3361411+08:00"
+    }
+  ],
+  "runs": [
+    {
+      "id": 1,
+      "caseId": 1,
+      "apiId": 1,
+      "caseName": "冒烟测试",
+      "startedAt": "2026-10-13T15:58:45.337211+08:00",
+      "durationMs": 46,
+      "firstByteMs": 46,
+      "statusCode": 200,
+      "success": true,
+      "errorCategory": "",
+      "errorMessage": "",
+      "responseHeaders": {
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Origin": "*",
+        "Content-Length": "109",
+        "Content-Type": "application/json; charset=utf-8",
+        "Date": "Tue, 13 Oct 2026 07:58:45 GMT"
+      },
+      "responseBody": "{\"message\":\"echo ok\",\"method\":\"POST\",\"received\":{\"message\":\"smoke\"},\"timestamp\":\"2026-10-13T15:58:45+08:00\"}\n",
+      "assertionPass": 2,
+      "assertionTotal": 2
+    },
+    {
+      "id": 2,
+      "caseId": 0,
+      "apiId": 2,
+      "caseName": "鉴权错误测试",
+      "startedAt": "2026-10-13T15:58:45.396773+08:00",
+      "durationMs": 0,
+      "firstByteMs": 0,
+      "statusCode": 401,
+      "success": false,
+      "errorCategory": "鉴权失败",
+      "errorMessage": "服务拒绝了请求，请检查 Authorization、API Key 或权限范围",
+      "responseHeaders": {
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Origin": "*",
+        "Content-Length": "68",
+        "Content-Type": "application/json; charset=utf-8",
+        "Date": "Tue, 13 Oct 2026 07:58:45 GMT"
+      },
+      "responseBody": "{\"code\":\"UNAUTHORIZED\",\"message\":\"缺少或错误的 Bearer Token\"}\n",
+      "assertionPass": 0,
+      "assertionTotal": 1
+    }
+  ],
+  "nextIds": {
+    "api": 4,
+    "case": 2,
+    "project": 2,
+    "run": 3
+  }
+}
