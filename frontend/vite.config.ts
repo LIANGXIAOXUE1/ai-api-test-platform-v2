@@ -13,7 +13,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8080'
+      // Docker Compose 将后端容器的 8080 映射到宿主机 8081；
+      // 开发服务器也使用该入口，避免 5175 预览页出现“请求失败”。
+      '/api': 'http://localhost:8081'
     }
   }
 })
