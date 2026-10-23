@@ -265,6 +265,137 @@
   filter:hue-rotate(205deg) saturate(.78) drop-shadow(0 2px 5px rgba(44,140,123,.12)) !important;
 }
 
+/* ===========================================================================
+   青绿色主题试用分支
+   参考：青绿色色阶 + 雾白背景。保留成功/失败语义色，不使用深海军蓝。
+   =========================================================================== */
+:root {
+  --ink:#17211F;
+  --muted:#66746F;
+  --faint:#94A19D;
+  --line:#D8E6E1;
+  --line-soft:#EAF1EF;
+  --blue:#149B8A;
+  --blue-dark:#0C7469;
+  --soft:#EDF6F3;
+  --accent:#25B3A0;
+  --cyan:#35BDB0;
+  --violet:#78B8AE;
+  --text-title:#17211F;
+  --text-body:#344540;
+  --text-muted:#66746F;
+  --text-faint:#94A19D;
+  --surface:#FFFFFF;
+  --surface-alt:#F8FBFA;
+  --surface-sunken:#EFF5F3;
+  --surface-violet:#EDF8F5;
+  --focus-ring:rgba(20,155,138,.20);
+  --sh-1:0 1px 2px rgba(23,33,31,.045);
+  --sh-2:0 4px 14px rgba(23,33,31,.075);
+  --sh-3:0 14px 34px rgba(12,61,55,.14);
+  --glow:0 0 0 4px rgba(37,179,160,.16);
+}
+body,
+#app,
+.app-v2 {
+  background:#F1F6F4 !important;
+  color:#17211F !important;
+}
+.topbar-v2 {
+  background:#103F39 !important;
+  border-bottom-color:#0B6056 !important;
+  box-shadow:0 4px 18px rgba(12,61,55,.18) !important;
+}
+.app-v2 .topbar-v2 .nav-btn.active,
+.app-v2.sidebar-collapsed .topbar-v2 .nav-btn.active {
+  background:#149B8A !important;
+  border-color:#149B8A !important;
+}
+.topbar-v2 .nav-btn:hover:not(.active),
+.topbar-v2 .sidebar-toggle:hover {
+  background:rgba(37,179,160,.25) !important;
+}
+.project-trigger,
+.app-v2 .topbar-v2 .project-trigger {
+  background:#155047 !important;
+  border-color:#287268 !important;
+}
+.app-v2 .topbar-v2 .project-trigger:hover,
+.app-v2 .topbar-v2 .project-trigger.open {
+  background:#1B665C !important;
+  border-color:#25B3A0 !important;
+}
+.primary-btn,
+.ai-btn,
+.send-btn,
+.add-btn,
+.evaluation-page .model-empty-button {
+  background:#149B8A !important;
+  border-color:#149B8A !important;
+  box-shadow:0 5px 14px rgba(20,155,138,.20) !important;
+}
+.primary-btn:hover,
+.ai-btn:hover,
+.send-btn:hover,
+.add-btn:hover {
+  background:#0C7469 !important;
+  border-color:#0C7469 !important;
+}
+.send-only,
+.ghost-btn,
+.mini-add,
+.import-btn {
+  border-color:#C8DED8 !important;
+  color:#0C7469 !important;
+}
+.send-only:hover,
+.ghost-btn:hover,
+.mini-add:hover,
+.import-btn:hover {
+  background:#EDF8F5 !important;
+  border-color:#25B3A0 !important;
+}
+.settings-card,
+.table-card,
+.request-card,
+.response-panel,
+.endpoint-panel,
+.model-card,
+.model-pool-empty-action {
+  border-color:#D8E6E1 !important;
+}
+.project-card:hover,
+.project-card.active,
+.model-pool-empty-action:hover {
+  background:#EDF8F5 !important;
+  border-color:#B9E5DD !important;
+}
+.provider-dot,
+.config-state,
+.result-pill,
+.method,
+.stream-tag {
+  background:#E3F5F0 !important;
+  border-color:#C0E6DD !important;
+  color:#0C7469 !important;
+}
+.online i,
+.brand-logo svg rect {
+  background:#25B3A0 !important;
+  fill:#25B3A0 !important;
+}
+.assistant-entry .assistant-icon {
+  background:linear-gradient(140deg,#F2FCFA,#E1F6F1) !important;
+  border-color:#BDE8DE !important;
+}
+.assistant-entry .assistant-icon::before {
+  background:linear-gradient(135deg,#62D4C2 0%,#25B3A0 54%,#0C7469 100%) !important;
+}
+.assistant-fab .robot-fab,
+.assistant-fab:hover .robot-fab {
+  filter:drop-shadow(0 3px 6px rgba(20,155,138,.18)) drop-shadow(0 8px 20px rgba(20,155,138,.14)) !important;
+}
+
 /* 链路步骤只需填写少量覆盖内容，保持为紧凑的两三行输入，不影响测试台编辑器。 */
 .chain-page .settings-card > label > textarea {
   min-height:72px !important;
