@@ -10415,3 +10415,74 @@ body,
 .assistant-message > .msg-avatar {
   filter:hue-rotate(205deg) saturate(.78) drop-shadow(0 2px 5px rgba(44,140,123,.12)) !important;
 }
+
+/* 青绿色主题收尾：历史 AI 组件曾使用紫色渐变，统一为同一组湖蓝绿层级。 */
+:root {
+  --violet:#6ABCAF;
+  --surface-violet:#EDF8F5;
+}
+.assistant-window,
+.assistant-window-head,
+.assistant-window-foot,
+.assistant-context,
+.assistant-draft-card,
+.assistant-plan-card,
+.assistant-composer,
+.ai-box,
+.ai-result {
+  border-color:#C8E9E1 !important;
+}
+.assistant-window-head,
+.assistant-window-foot,
+.assistant-context,
+.assistant-draft-card,
+.assistant-plan-card,
+.ai-result {
+  background:#F4FBF9 !important;
+}
+.assistant-draft-card,
+.assistant-plan-card,
+.ai-result {
+  box-shadow:0 8px 22px rgba(20,155,138,.08) !important;
+}
+.assistant-message.user > span,
+.assistant-message > .msg-avatar-user,
+.assistant-plan-step i,
+.composer-chip,
+.composer-upload {
+  background:#E3F5F0 !important;
+  border-color:#BFE5DC !important;
+  color:#0C7469 !important;
+}
+.composer-chip:hover,
+.composer-upload:hover {
+  background:#D6F0EA !important;
+  border-color:#6ABCAF !important;
+}
+.assistant-entry .assistant-icon,
+.assistant-message > .msg-avatar {
+  background:linear-gradient(140deg,#F2FBF9,#E0F4EF) !important;
+  border-color:#BFE7DF !important;
+}
+.assistant-entry {
+  background:linear-gradient(120deg,#F2FBF9 0%,#F7FCFB 100%) !important;
+  border-color:#C8E9E1 !important;
+  box-shadow:0 6px 18px rgba(20,155,138,.06) !important;
+}
+.method-select {
+  background:#E3F5F0 !important;
+  border-color:#BFE5DC !important;
+  color:#0C7469 !important;
+}
+/* 对话消息头像 SVG 内仍有旧紫色渐变，覆盖 stop 色而不修改图形结构。 */
+.assistant-message > .msg-avatar svg #maShell stop:nth-child(2) { stop-color:#F0FAF8 !important; }
+.assistant-message > .msg-avatar svg #maShell stop:nth-child(3) { stop-color:#D8EFEB !important; }
+.assistant-message > .msg-avatar svg #maVisor stop:nth-child(1) { stop-color:#68CBBE !important; }
+.assistant-message > .msg-avatar svg #maVisor stop:nth-child(2) { stop-color:#39A99A !important; }
+.assistant-message > .msg-avatar svg #maVisor stop:nth-child(3) { stop-color:#1F7E75 !important; }
+.assistant-message > .msg-avatar svg #maEar stop:nth-child(1) { stop-color:#9DE0D4 !important; }
+.assistant-message > .msg-avatar svg #maEar stop:nth-child(2) { stop-color:#5DBDAC !important; }
+.assistant-message > .msg-avatar svg rect[fill="none"] { stroke:#BFE7DF !important; }
+.assistant-message > .msg-avatar {
+  filter:drop-shadow(0 2px 5px rgba(20,155,138,.12)) !important;
+}

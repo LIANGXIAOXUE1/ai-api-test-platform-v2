@@ -550,7 +550,7 @@ const App = {
     <header class="topbar-v2"><div class="brand-v2"><div class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none">
           <defs>
             <linearGradient id="bgGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#8E9CF7"/><stop offset=".55" stop-color="#6C5CE7"/><stop offset="1" stop-color="#4A46C8"/>
+              <stop stop-color="#68CBBE"/><stop offset=".55" stop-color="#39A99A"/><stop offset="1" stop-color="#1F7E75"/>
             </linearGradient>
           </defs>
           <rect width="32" height="32" rx="9" fill="url(#bgGrad)"/>
