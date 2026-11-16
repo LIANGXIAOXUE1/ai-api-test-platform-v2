@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { authRequiredEvent } from '../auth/auth'
 import ProjectTaskSetup from './ProjectTaskSetup.vue'
 import ProjectTaskReport from './ProjectTaskReport.vue'
 import { newProjectTask, type ProjectTask, type ProjectRun } from './taskTypes'
@@ -108,6 +109,7 @@ async function download(format: string) {
   if (!activeRun.value) return
   try {
     const response = await fetch('/api/project-tests/export?projectId=' + props.projectId + '&id=' + activeRun.value.id + '&format=' + format)
+    if (response.status === 401) window.dispatchEvent(new Event(authRequiredEvent))
     if (!response.ok) throw new Error('报告导出失败')
     const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a')
     a.href = url; a.download = 'project-test-' + activeRun.value.id + (format === 'json' ? '.json' : '.md'); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)

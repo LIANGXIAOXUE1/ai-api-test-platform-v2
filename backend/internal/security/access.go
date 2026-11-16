@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Access is a single-owner deployment gate, not a multi-tenant user system.
@@ -18,6 +20,9 @@ type Access struct {
 	password   [32]byte
 	Enabled    bool
 	Origins    map[string]bool
+	mu         sync.Mutex
+	sessions   map[[32]byte]time.Time
+	attempts   map[string]loginAttempt
 }
 
 func ReadSecret(name string) (string, error) {
@@ -79,10 +84,24 @@ func (a *Access) authenticated(r *http.Request) bool {
 	if !a.Enabled {
 		return true
 	}
+	if a.sessionAuthenticated(r) {
+		return true
+	}
+	// Browser sessions must be revocable even if the browser cached old Basic
+	// credentials. Basic remains available to non-browser CLI/MCP clients.
+	if r.Header.Get("Sec-Fetch-Mode") != "" {
+		return false
+	}
 	user, password, ok := r.BasicAuth()
+	return ok && a.validCredentials(user, password)
+}
+
+func (a *Access) validCredentials(user, password string) bool {
 	userHash, expectedUser := sha256.Sum256([]byte(user)), sha256.Sum256([]byte(a.User))
 	passwordHash := sha256.Sum256([]byte(password))
-	return ok && subtle.ConstantTimeCompare(userHash[:], expectedUser[:]) == 1 && subtle.ConstantTimeCompare(passwordHash[:], a.password[:]) == 1
+	u := subtle.ConstantTimeCompare(userHash[:], expectedUser[:])
+	p := subtle.ConstantTimeCompare(passwordHash[:], a.password[:])
+	return u&p == 1
 }
 
 func (a *Access) allowedOrigin(r *http.Request) bool {
@@ -117,20 +136,22 @@ func (a *Access) Middleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		if a.serveAuth(w, r) {
+			return
+		}
 		if r.URL.Path == "/api/health" && r.Method == http.MethodGet {
 			next.ServeHTTP(w, r)
 			return
 		}
 		// A server-side test of the harmless built-in examples must retain its
 		// target Bearer header. Only numeric loopback connections can bypass the
-		// platform login here; the HTTPS frontend still protects /api/demo/.
+		// platform login here; remote/proxied requests still require login.
 		host, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() && strings.HasPrefix(r.URL.Path, "/api/demo/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		if !a.authenticated(r) {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Pulse API", charset="UTF-8"`)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":"请先登录测试平台"}`))

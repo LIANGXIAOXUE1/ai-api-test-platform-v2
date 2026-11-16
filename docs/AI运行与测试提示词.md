@@ -1,6 +1,6 @@
 # AI 运行与测试提示词
 
-统一修订：2026-11-16。与同日验收指南、67项CSV及测试团队交付清单配套；本次只是文档更新。先读取验收指南“当前版本状态与已知问题”，不要把旧方案或历史演示当作当前版已验收结果。
+统一修订：2026-11-16。与同日验收指南、71项CSV及测试团队交付清单配套；已更新平台登录页/会话及配套验收项。先读取验收指南“当前版本状态与已知问题”，不要把旧方案或历史演示当作当前版已验收结果。
 
 ## 一、把下面整段发给有终端权限的 AI（推荐）
 
@@ -22,7 +22,7 @@ docs/同伴验收结果填写模板.csv 和 deploy/docker-compose.acceptance.yml
    检查 5177/8082 端口；冲突时使用 PLATFORM_WEB_PORT/CLOUD_DISK_PORT 改映射，不终止其他项目。
    执行 docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.yml up -d --build。
    用 ps/日志/真实HTTP检查确认平台和云盘就绪。首次拉镜像需要网络，失败请检查Docker代理，不能虚报成功。
-4. 平台浏览器默认 http://127.0.0.1:5177，登录凭据读本地 env；
+4. 平台浏览器默认 http://127.0.0.1:5177，在平台内登录表单填写本地env账号，不需要注册；平台是共享管理员实例，云盘账号另填；
    云盘文档 http://127.0.0.1:8082/v3/api-docs。
    平台后端在容器里，所以项目任务的 baseUrl 和 OpenAPI地址使用 http://cloud-disk:8082；
    不把容器 localhost 误当主机。网页导入是JSON文件：下载文档并改servers[0].url后导入。
@@ -30,7 +30,7 @@ docs/同伴验收结果填写模板.csv 和 deploy/docker-compose.acceptance.yml
    docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.yml --profile checks run --rm smoke
    打开 .runtime/peer-acceptance 最新目录的 acceptance.md/acceptance.json 和云盘报告。
    核心链路自动注册唯一测试账号，登录提取token，目录重名验证，上传下载SHA256，改名，软删除/还原及鉴权。
-6. 对照67项验收CSV补测页面、历史、下载、重启、权限和异常。
+6. 对照71项验收CSV补测页面、历史、下载、重启、权限和异常。
    DOC-Q01～DOC-Q04是已知收尾/边界项，按EV-07～EV-14实际核对；没有修好时如实记录问题。
    这次任务是运行与测试，不擅自修改评分标准、删除旧证据或修代码；修复应在另行授权后重测。原CSV是空白模板，另存一份我的执行结果。
    如我提供真实模型Key，再验收助手语义与3类业务模型测评；Key只存本地，不发到报告、聊天、Git。
