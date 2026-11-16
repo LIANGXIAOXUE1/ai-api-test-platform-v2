@@ -13,7 +13,7 @@ export type ProjectRun = {
   id: number; projectId: number; taskId: number; sourceRunId?: number; task: ProjectTask
   status: string; currentStep: string; results: any[]; variables: Record<string, string>; error?: string
   summary: { total: number; passed: number; failed: number; blocked: number; notRun: number }
-  createdAt: string; finishedAt?: string
+  createdBy?: string; createdAt: string; finishedAt?: string
 }
 export const newProjectTask = (projectId: number): ProjectTask => ({
   id: 0, projectId, name: '核心业务流程测试', baseUrl: 'http://localhost:8082',

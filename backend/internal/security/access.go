@@ -13,16 +13,20 @@ import (
 	"time"
 )
 
-// Access is a single-owner deployment gate, not a multi-tenant user system.
+// Access authenticates users and applies role/project authorization to APIs.
 type Access struct {
-	Production bool
-	User       string
-	password   [32]byte
-	Enabled    bool
-	Origins    map[string]bool
-	mu         sync.Mutex
-	sessions   map[[32]byte]time.Time
-	attempts   map[string]loginAttempt
+	Production   bool
+	User         string
+	password     [32]byte
+	Enabled      bool
+	Origins      map[string]bool
+	mu           sync.Mutex
+	sessions     map[[32]byte]time.Time
+	attempts     map[string]loginAttempt
+	sessionUsers map[[32]byte]sessionIdentity
+	repository   UserRepository
+	users        *UserStore
+	resolver     ScopeResolver
 }
 
 func ReadSecret(name string) (string, error) {
@@ -81,19 +85,8 @@ func (a *Access) ListenAddress(port string) (string, error) {
 }
 
 func (a *Access) authenticated(r *http.Request) bool {
-	if !a.Enabled {
-		return true
-	}
-	if a.sessionAuthenticated(r) {
-		return true
-	}
-	// Browser sessions must be revocable even if the browser cached old Basic
-	// credentials. Basic remains available to non-browser CLI/MCP clients.
-	if r.Header.Get("Sec-Fetch-Mode") != "" {
-		return false
-	}
-	user, password, ok := r.BasicAuth()
-	return ok && a.validCredentials(user, password)
+	_, ok, _ := a.principal(r)
+	return ok
 }
 
 func (a *Access) validCredentials(user, password string) bool {
@@ -151,16 +144,25 @@ func (a *Access) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if !a.authenticated(r) {
+		principal, ok, err := a.principal(r)
+		if err != nil {
+			authJSON(w, 503, map[string]string{"error": "账号服务暂时不可用，请稍后重试"})
+			return
+		}
+		if !ok {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":"请先登录测试平台"}`))
+			return
+		}
+		r = r.WithContext(WithUser(r.Context(), principal))
+		if a.serveUsers(w, r, principal) {
 			return
 		}
 		if r.URL.Path == "/api/access" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		next.ServeHTTP(w, r)
+		a.serveAuthorized(next, w, r, principal)
 	})
 }

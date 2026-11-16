@@ -3,8 +3,10 @@ package security
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -20,6 +22,58 @@ const maxAuthEntries = 1024
 type loginAttempt struct {
 	count int
 	until time.Time
+}
+type sessionIdentity struct {
+	ID      int64
+	Version int64
+}
+
+func (a *Access) credentials(r *http.Request, user, password string) (User, bool, error) {
+	if len(password) > 1024 || len(user) > 256 {
+		return User{}, false, nil
+	}
+	if a.repository != nil {
+		return a.repository.Authenticate(r.Context(), user, password)
+	}
+	u := User{Username: a.User, Role: RoleAdmin, Enabled: true, AllowAuto: true, ProjectIDs: []int{}}
+	return u, a.validCredentials(user, password), nil
+}
+func (a *Access) browserPrincipal(r *http.Request) (User, bool, error) {
+	if !a.sessionAuthenticated(r) {
+		return User{}, false, nil
+	}
+	if a.repository == nil {
+		return User{Username: a.User, Role: RoleAdmin, Enabled: true, AllowAuto: true}, true, nil
+	}
+	key, _ := sessionKey(r)
+	a.mu.Lock()
+	identity, ok := a.sessionUsers[key]
+	a.mu.Unlock()
+	if !ok {
+		return User{}, false, nil
+	}
+	u, err := a.repository.User(r.Context(), identity.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, false, nil
+	}
+	return u, err == nil && u.Enabled && u.Version == identity.Version, err
+}
+func (a *Access) principal(r *http.Request) (User, bool, error) {
+	if !a.Enabled {
+		return User{Username: "local-development", Role: RoleAdmin, Enabled: true, AllowAuto: true}, true, nil
+	}
+	u, ok, err := a.browserPrincipal(r)
+	if ok || err != nil {
+		return u, ok, err
+	}
+	if r.Header.Get("Sec-Fetch-Mode") != "" {
+		return User{}, false, nil
+	}
+	user, password, ok := r.BasicAuth()
+	if !ok {
+		return User{}, false, nil
+	}
+	return a.credentials(r, user, password)
 }
 
 func sessionKey(r *http.Request) ([32]byte, bool) {
@@ -40,6 +94,7 @@ func (a *Access) sessionAuthenticated(r *http.Request) bool {
 	expires, ok := a.sessions[key]
 	if ok && !time.Now().Before(expires) {
 		delete(a.sessions, key)
+		delete(a.sessionUsers, key)
 		return false
 	}
 	return ok
@@ -64,6 +119,7 @@ func (a *Access) revokeSession(r *http.Request) {
 	if key, ok := sessionKey(r); ok {
 		a.mu.Lock()
 		delete(a.sessions, key)
+		delete(a.sessionUsers, key)
 		a.mu.Unlock()
 	}
 }
@@ -113,10 +169,15 @@ func (a *Access) serveAuth(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	if path == "/api/auth/session" {
-		loggedIn := !a.Enabled || a.sessionAuthenticated(r)
+		u, loggedIn, err := a.browserPrincipal(r)
+		if err != nil {
+			authJSON(w, 503, map[string]string{"error": "账号服务暂时不可用，请重试"})
+			return true
+		}
+		loggedIn = !a.Enabled || loggedIn
 		var user any
 		if a.Enabled && loggedIn {
-			user = map[string]string{"username": a.User, "role": "administrator"}
+			user = u
 		}
 		authJSON(w, http.StatusOK, map[string]any{"authenticationRequired": a.Enabled, "authenticated": loggedIn, "user": user})
 		return true
@@ -154,7 +215,12 @@ func (a *Access) serveAuth(w http.ResponseWriter, r *http.Request) bool {
 		authJSON(w, http.StatusBadRequest, map[string]string{"error": "登录请求格式不正确"})
 		return true
 	}
-	if !a.validCredentials(strings.TrimSpace(input.Username), input.Password) {
+	user, valid, err := a.credentials(r, strings.TrimSpace(input.Username), input.Password)
+	if err != nil {
+		authJSON(w, 503, map[string]string{"error": "账号服务暂时不可用，请重试"})
+		return true
+	}
+	if !valid {
 		authJSON(w, http.StatusUnauthorized, map[string]string{"error": "账号或密码不正确，请检查后重试"})
 		return true
 	}
@@ -169,13 +235,18 @@ func (a *Access) serveAuth(w http.ResponseWriter, r *http.Request) bool {
 	if a.sessions == nil {
 		a.sessions = make(map[[32]byte]time.Time)
 	}
+	if a.sessionUsers == nil {
+		a.sessionUsers = make(map[[32]byte]sessionIdentity)
+	}
 	for key, expires := range a.sessions {
 		if !now.Before(expires) {
 			delete(a.sessions, key)
+			delete(a.sessionUsers, key)
 		}
 	}
 	if key, ok := sessionKey(r); ok {
 		delete(a.sessions, key)
+		delete(a.sessionUsers, key)
 	}
 	if len(a.sessions) >= maxAuthEntries {
 		a.mu.Unlock()
@@ -183,8 +254,9 @@ func (a *Access) serveAuth(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	a.sessions[sha256.Sum256([]byte(token))] = now.Add(sessionLifetime)
+	a.sessionUsers[sha256.Sum256([]byte(token))] = sessionIdentity{ID: user.ID, Version: user.Version}
 	a.mu.Unlock()
 	a.writeSessionCookie(w, r, token, int(sessionLifetime.Seconds()))
-	authJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": map[string]string{"username": a.User, "role": "administrator"}})
+	authJSON(w, http.StatusOK, map[string]any{"authenticated": true, "user": user})
 	return true
 }

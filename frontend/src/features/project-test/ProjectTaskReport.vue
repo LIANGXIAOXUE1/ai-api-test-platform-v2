@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePermissions } from '../auth/usePermissions'
+const { readOnly, canAuto, isAdmin } = usePermissions()
 import { computed, ref, watch, nextTick } from 'vue'
 import type { ProjectRun } from './taskTypes'
 const props = defineProps<{ run: ProjectRun }>()
@@ -14,9 +16,9 @@ const verdict = computed(() => active.value ? '正在执行' : props.run.status 
 <template>
   <div class="bt-form">
     <div class="bt-section">
-      <div class="bt-heading"><div><h2>{{ run.task.name }}</h2><p class="bt-hint">{{ run.task.baseUrl }} · {{ new Date(run.createdAt).toLocaleString() }}</p></div><div class="bt-actions"><button v-if="active" class="send-only" @click="emit('stop')">停止任务</button><button v-else-if="run.summary.failed || run.summary.blocked || run.summary.notRun" class="send-only" @click="emit('rerun')">重跑失败及依赖步骤</button><button class="send-only" @click="emit('download', 'markdown')">导出 Markdown</button><button class="send-only" @click="emit('download', 'json')">导出 JSON</button></div></div>
-      <div class="bt-summary" aria-live="polite"><b>{{ verdict }}</b><span>总计 {{ run.summary.total }}</span><span>通过 {{ run.summary.passed }}</span><span>失败 {{ run.summary.failed }}</span><span>阻塞 {{ run.summary.blocked }}</span><span>未执行 {{ run.summary.notRun }}</span></div>
-      <p v-if="active" class="bt-hint">当前操作：{{ run.currentStep || '任务排队中' }}。已完成结果持续保存。</p>
+      <div class="bt-heading"><div><h2>{{ run.task.name }}</h2><p class="bt-hint">{{ run.task.baseUrl }} · {{ new Date(run.createdAt).toLocaleString() }}</p></div><div class="bt-actions"><button v-if="active && !readOnly" class="send-only" @click="emit('stop')">停止任务</button><button v-else-if="!readOnly && (run.summary.failed || run.summary.blocked || run.summary.notRun)" class="send-only" @click="emit('rerun')">重跑失败及依赖步骤</button><button class="send-only" @click="emit('download', 'markdown')">导出 Markdown</button><button class="send-only" @click="emit('download', 'json')">导出 JSON</button></div></div>
+      <p class="bt-hint">执行人：{{ run.createdBy || '历史记录未记录' }}</p><div class="bt-summary" aria-live="polite"><b>{{ verdict }}</b><span>总计 {{ run.summary.total }}</span><span>通过 {{ run.summary.passed }}</span><span>失败 {{ run.summary.failed }}</span><span>阻塞 {{ run.summary.blocked }}</span><span>未执行 {{ run.summary.notRun }}</span></div>
+      <p v-if="active && !readOnly" class="bt-hint">当前操作：{{ run.currentStep || '任务排队中' }}。已完成结果持续保存。</p>
       <p v-if="run.error" class="bt-error">{{ run.error }}</p>
     </div>
     <section class="bt-section">

@@ -872,6 +872,9 @@ func (s *store) runs(ctx context.Context, projectIDs ...int) ([]RunRecord, error
 		query = `SELECT id,project_id,COALESCE(case_id,0),COALESCE(api_id,0),case_name,started_at,duration_ms,first_byte_ms,status_code,success,error_category,error_message,response_headers,response_body,content_type,is_stream,input_tokens,output_tokens,tokens_per_sec,assertion_pass,assertion_total FROM runs WHERE project_id=$1 ORDER BY started_at DESC,id DESC`
 		args = append(args, projectIDs[0])
 	}
+	if user, ok := security.CurrentUser(ctx); ok && user.Role == security.RoleViewer {
+		query = strings.ReplaceAll(query, "response_headers,response_body", "'{}'::jsonb AS response_headers,''::text AS response_body")
+	}
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -1043,6 +1046,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer database.db.Close()
+	if err := access.BindUsers(context.Background(), database.db); err != nil {
+		log.Fatal(err)
+	}
+	access.SetResolver(resourceResolver{db: database.db})
 	s := &server{store: database, client: security.HTTPClient(30 * time.Second), llmBaseURL: strings.TrimSpace(os.Getenv("LLM_BASE_URL")), llmAPIKey: strings.TrimSpace(os.Getenv("LLM_API_KEY")), llmModel: firstNonEmpty(os.Getenv("LLM_MODEL"), "gpt-4o-mini"), llmAuthHeader: firstNonEmpty(os.Getenv("LLM_AUTH_HEADER"), "Authorization"), llmReasoningMode: "auto", llmReasoningEffort: "medium"}
 	mux := http.NewServeMux()
 	if err := s.registerProjectTasks(mux); err != nil {
@@ -3706,7 +3713,8 @@ func (s *server) mustAPIs(ctx context.Context, projectID int) []Endpoint {
 
 func (s *server) regression(w http.ResponseWriter, r *http.Request) {
 	caseID, _ := strconv.Atoi(r.URL.Query().Get("caseId"))
-	runs, err := s.store.runs(r.Context())
+	projectID, _ := strconv.Atoi(r.URL.Query().Get("projectId"))
+	runs, err := s.store.runs(r.Context(), projectID)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return

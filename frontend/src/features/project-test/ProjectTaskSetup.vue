@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePermissions } from '../auth/usePermissions'
+const { readOnly, canAuto, isAdmin } = usePermissions()
 import type { ProjectTask } from './taskTypes'
 const task = defineModel<ProjectTask>({ required: true })
 defineProps<{ busy: boolean }>()

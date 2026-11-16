@@ -67,7 +67,7 @@ async function login() {
         </form>
         <div class="login-help">
           <p>使用管理员提供的平台账号，当前无需注册。</p>
-          <p>平台账号用于访问共享工作台。被测项目的登录账号在测试任务中另行配置。</p>
+          <p>平台账号用于访问获分配的项目。被测项目的登录账号在测试任务中另行配置。</p>
         </div>
       </section>
       <footer class="login-footer">项目测试 · 业务模型测评 · 测试记录</footer>

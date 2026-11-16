@@ -1,6 +1,7 @@
 import type { InjectionKey, Ref } from 'vue'
 
-export type PlatformUser = { username: string; role: 'administrator' }
+export type PlatformUser = { id: number; username: string; role: 'administrator' | 'tester' | 'viewer'; projectIds: number[]; allowAuto: boolean; enabled: boolean }
+export const roleLabel = (role: PlatformUser['role']) => ({administrator:'管理员',tester:'测试员',viewer:'只读用户'}[role])
 export type SessionState = { authenticationRequired: boolean; authenticated: boolean; user: PlatformUser | null }
 export const authRequiredEvent = 'pulse-auth-required'
 export const platformAuthKey: InjectionKey<{

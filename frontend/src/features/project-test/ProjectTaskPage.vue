@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePermissions } from '../auth/usePermissions'
+const { readOnly, canAuto, isAdmin } = usePermissions()
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { authRequiredEvent } from '../auth/auth'
 import ProjectTaskSetup from './ProjectTaskSetup.vue'
@@ -7,7 +9,7 @@ import { newProjectTask, type ProjectTask, type ProjectRun } from './taskTypes'
 import '../shared/business-testing.css'
 const props = defineProps<{ projectId: number; projectName: string; initialGoal?: string; request: (path: string, options?: RequestInit) => Promise<any> }>()
 const emit = defineEmits<{ imported: [] }>()
-const tab = ref('setup')
+const tab = ref(readOnly.value ? 'history' : 'setup')
 const form = ref(newProjectTask(props.projectId))
 if (props.initialGoal) { form.value.goal = props.initialGoal; form.value.template = 'ai' }
 const tasks = ref<ProjectTask[]>([])
@@ -88,7 +90,7 @@ async function poll() {
   } catch (e) { error.value = '进度读取失败，已完成结果保留：' + (e as Error).message; timer = setTimeout(poll, 2500) }
 }
 async function openRun(run: ProjectRun) { clearTimeout(timer); activeRun.value = run; tab.value = 'result'; poll() }
-function edit(task: ProjectTask) { restoring = true; form.value = { ...JSON.parse(JSON.stringify(task)), password: '', fileData: '' }; variableEditor.value=JSON.stringify(task.initialVariables || {},null,2); stepEditor.value = task.steps.length ? JSON.stringify(task.steps, null, 2) : ''; confirmed.value = false; tab.value = 'setup'; restoring = false }
+function edit(task: ProjectTask) { restoring = true; form.value = { ...JSON.parse(JSON.stringify(task)), password: '', fileData: '' }; variableEditor.value=JSON.stringify(task.initialVariables || {},null,2); stepEditor.value = task.steps.length ? JSON.stringify(task.steps, null, 2) : ''; confirmed.value = false; tab.value = readOnly.value ? 'history' : 'setup'; restoring = false }
 async function file(event: Event) {
   try {
     const selected = (event.target as HTMLInputElement).files?.[0]; if (!selected) return
@@ -116,8 +118,8 @@ async function download(format: string) {
     notice.value = '报告已开始下载，请查看浏览器下载列表。'
   } catch (e) { error.value = (e as Error).message }
 }
-watch(() => props.projectId, () => { clearTimeout(timer); form.value = newProjectTask(props.projectId); activeRun.value = null; tasks.value = []; runs.value = []; stepEditor.value = ''; tab.value = 'setup'; load() })
-watch(() => props.initialGoal, goal => { if (goal && goal !== form.value.goal) { form.value.goal = goal; form.value.template = 'ai'; tab.value = 'setup' } })
+watch(() => props.projectId, () => { clearTimeout(timer); form.value = newProjectTask(props.projectId); activeRun.value = null; tasks.value = []; runs.value = []; stepEditor.value = ''; tab.value = readOnly.value ? 'history' : 'setup'; load() })
+watch(() => props.initialGoal, goal => { if (goal && goal !== form.value.goal) { form.value.goal = goal; form.value.template = 'ai'; tab.value = readOnly.value ? 'history' : 'setup' } })
 watch(() => JSON.stringify([form.value.accountMode, form.value.template, form.value.features, form.value.baseUrl, form.value.openApiUrl, form.value.goal]), (_value, old) => {
   if (!restoring && old && form.value.steps.length) { form.value.steps = []; stepEditor.value = ''; confirmed.value = false; notice.value = '任务范围已变化，请重新生成测试流程。' }
 }, { flush: 'sync' })
@@ -128,8 +130,8 @@ const runLabel = (run: ProjectRun) => ['queued', 'running'].includes(run.status)
 <template>
   <section class="list-page business-testing">
     <slot name="workspace-nav" />
-    <div class="page-title"><div><h1>项目测试</h1><p>{{ projectName }} · 验证已启动项目的核心业务，并保留每次执行证据。</p></div><button class="send-only" @click="form = newProjectTask(projectId); stepEditor = ''; variableEditor = '{}'; inputs = []; confirmed = false; tab = 'setup'">创建新任务</button></div>
-    <nav class="bt-tabs" aria-label="项目测试工作区"><button :class="{ active: tab === 'setup' }" @click="tab = 'setup'">任务配置</button><button :class="{ active: tab === 'result' }" @click="tab = 'result'">执行结果</button><button :class="{ active: tab === 'history' }" @click="tab = 'history'; load()">已保存任务与记录</button><button :class="{active:tab==='chain'}" @click="tab='chain'">手动链路</button></nav>
+    <div class="page-title"><div><h1>项目测试</h1><p>{{ projectName }} · 验证已启动项目的核心业务，并保留每次执行证据。</p></div><button v-if="!readOnly" class="send-only" @click="form = newProjectTask(projectId); stepEditor = ''; variableEditor = '{}'; inputs = []; confirmed = false; tab = 'setup'">创建新任务</button></div>
+    <nav class="bt-tabs" aria-label="项目测试工作区"><button v-if="!readOnly" :class="{ active: tab === 'setup' }" @click="tab = 'setup'">任务配置</button><button :class="{ active: tab === 'result' }" @click="tab = 'result'">执行结果</button><button :class="{ active: tab === 'history' }" @click="tab = 'history'; load()">已保存任务与记录</button><button v-if="!readOnly" :class="{active:tab==='chain'}" @click="tab='chain'">手动链路</button></nav>
     <slot v-if="tab==='chain'" name="manual-chain" />
     <p v-if="error" class="bt-error" role="alert">{{ error }}</p><p v-if="notice" class="bt-notice" role="status">{{ notice }}</p>
     <template v-if="tab === 'setup'">
@@ -145,7 +147,7 @@ const runLabel = (run: ProjectRun) => ['queued', 'running'].includes(run.status)
     </template>
     <template v-if="tab === 'result'"><ProjectTaskReport v-if="activeRun" :run="activeRun" @rerun="execute(activeRun.id)" @stop="stop" @download="download"/><div v-else class="bt-empty">还没有选择执行记录。先配置任务，或从历史记录中打开报告。</div></template>
     <div v-if="tab === 'history'" class="bt-form">
-      <section class="bt-section"><h2>已保存的测试任务</h2><p class="bt-hint">保存地址、账号方式、样本、流程和标准；再次运行会产生新记录。</p><div v-for="task in tasks" :key="task.id" class="bt-record"><div><b>{{ task.name }}</b><small>{{ task.baseUrl }} · {{ task.accountMode === 'auto' ? '自动创建账号' : '指定账号' }} · {{ task.steps.length }} 个步骤</small></div><button class="send-only" @click="edit(task)">查看 / 修改 / 再次执行</button></div><p v-if="!tasks.length" class="bt-hint">还没有任务。保存后可跨刷新复用。</p></section>
+      <section v-if="!readOnly" class="bt-section"><h2>已保存的测试任务</h2><p class="bt-hint">保存地址、账号方式、样本、流程和标准；再次运行会产生新记录。</p><div v-for="task in tasks" :key="task.id" class="bt-record"><div><b>{{ task.name }}</b><small>{{ task.baseUrl }} · {{ task.accountMode === 'auto' ? '自动创建账号' : '指定账号' }} · {{ task.steps.length }} 个步骤</small></div><button class="send-only" @click="edit(task)">查看 / 修改 / 再次执行</button></div><p v-if="!tasks.length" class="bt-hint">还没有任务。保存后可跨刷新复用。</p></section>
       <section class="bt-section"><h2>历史执行记录</h2><p class="bt-hint">打开报告只读取原结果，不会重新发起请求。</p><div v-for="run in runs" :key="run.id" class="bt-record"><div><b>{{ run.task.name }}</b><small>{{ new Date(run.createdAt).toLocaleString() }} · {{ runLabel(run) }}</small></div><button class="send-only" @click="openRun(run)">查看报告</button></div><p v-if="!runs.length" class="bt-hint">还没有执行记录。</p></section>
     </div>
     <div v-if="inputs.length" class="modal-mask"><section class="modal-card" role="dialog" aria-modal="true" aria-label="补充测试信息"><h2>助手需要这些测试信息</h2><p class="bt-hint">填写后继续生成或执行当前任务。</p><label v-for="item in inputs" :key="item.field">{{ item.question }}<input v-model="item.value" :type="item.secret ? 'password' : 'text'"></label><p v-if="error" class="bt-error">{{ error }}</p><div class="modal-actions"><button class="send-only" @click="inputs=[]">稍后填写</button><button class="primary-btn" @click="supplyInputs">补充并继续</button></div></section></div>

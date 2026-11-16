@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { usePermissions } from '../auth/usePermissions'
+const { readOnly, canAuto, isAdmin } = usePermissions()
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { defaultSuite, type EvaluationSuite, type BusinessEvaluationRun } from './types'
 import EvaluationComparison from './EvaluationComparison.vue'
@@ -11,7 +13,7 @@ const runs = ref<BusinessEvaluationRun[]>([])
 const legacy = ref<any[]>([])
 const legacyReport = ref<any>(null)
 const activeRun = ref<BusinessEvaluationRun | null>(null)
-const tab = ref('setup')
+const tab = ref(readOnly.value ? 'history' : 'setup')
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -49,7 +51,7 @@ async function poll() {
   } catch (e) { error.value = (e as Error).message; timer = setTimeout(poll, 2500) }
 }
 function open(run: BusinessEvaluationRun) { clearTimeout(timer); activeRun.value = run; tab.value = 'result'; legacyReport.value = null; poll() }
-function edit(suite: EvaluationSuite) { form.value = JSON.parse(JSON.stringify(suite)); tab.value = 'setup' }
+function edit(suite: EvaluationSuite) { form.value = JSON.parse(JSON.stringify(suite)); tab.value = readOnly.value ? 'history' : 'setup' }
 async function upload(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return
   if (file.size > 1024 * 1024) { error.value = '业务资料最多 1 MB 文本。'; return }
@@ -72,15 +74,15 @@ function download(format: string) {
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'evaluation-' + run.id + (format === 'json' ? '.json' : '.md'); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
   notice.value = '报告已开始下载，请查看浏览器下载列表。'
 }
-watch(() => props.projectId, () => { clearTimeout(timer); form.value = defaultSuite(props.projectId); activeRun.value = null; legacyReport.value = null; tab.value = 'setup'; load() })
+watch(() => props.projectId, () => { clearTimeout(timer); form.value = defaultSuite(props.projectId); activeRun.value = null; legacyReport.value = null; tab.value = readOnly.value ? 'history' : 'setup'; load() })
 onMounted(load)
 onBeforeUnmount(() => clearTimeout(timer))
 </script>
 <template>
   <section class="list-page business-testing">
     <slot name="workspace-nav" />
-    <div class="page-title"><div><h1>业务场景模型测评</h1><p>依据客户目标和明确标准，对照真实模型输出、耗时和用量。</p></div><button class="send-only" @click="emit('add-model')">管理 / 添加模型</button></div>
-    <nav class="bt-tabs"><button :class="{active:tab==='setup'}" @click="tab='setup'">客户需求与测试样本</button><button :class="{active:tab==='result'}" @click="tab='result'">测评结果</button><button :class="{active:tab==='history'}" @click="tab='history';load()">已保存任务与记录</button></nav>
+    <div class="page-title"><div><h1>业务场景模型测评</h1><p>依据客户目标和明确标准，对照真实模型输出、耗时和用量。</p></div><button class="send-only" v-if="isAdmin" @click="emit('add-model')">管理 / 添加模型</button></div>
+    <nav class="bt-tabs"><button v-if="!readOnly" :class="{active:tab==='setup'}" @click="tab='setup'">客户需求与测试样本</button><button :class="{active:tab==='result'}" @click="tab='result'">测评结果</button><button :class="{active:tab==='history'}" @click="tab='history';load()">已保存任务与记录</button></nav>
     <p v-if="error" class="bt-error" role="alert">{{ error }}</p><p v-if="notice" class="bt-notice" role="status">{{ notice }}</p>
     <div v-if="tab==='setup'" class="bt-form">
       <section class="bt-section">
@@ -92,7 +94,7 @@ onBeforeUnmount(() => clearTimeout(timer))
         <label class="bt-file">补充业务资料（TXT / Markdown）<input type="file" accept=".txt,.md" @change="upload"></label>
       </section>
       <section class="bt-section">
-        <div class="bt-heading"><h2>候选模型与评审来源</h2><button class="link-btn" @click="emit('add-model')">添加模型</button></div>
+        <div class="bt-heading"><h2>候选模型与评审来源</h2><button class="link-btn" v-if="isAdmin" @click="emit('add-model')">添加模型</button></div>
         <div class="bt-checks"><label v-for="profile in profiles.filter(item=>item.enabled)" :key="profile.id"><input v-model="form.profileIds" type="checkbox" :value="profile.id"><span>{{ profile.name }}<small>{{ profile.provider }} · {{ profile.model }}</small></span></label></div>
         <p v-if="!profiles.length" class="bt-hint">请先添加真实文本模型，密钥在模型池中填写。</p>
         <div class="bt-fields"><label>语义评审模型<select v-model.number="form.judgeProfileId"><option :value="0">使用当前助手模型；不可用时保留待复核</option><option v-for="profile in profiles.filter(item=>item.enabled)" :key="profile.id" :value="profile.id">{{ profile.name }} · {{ profile.model }}</option></select></label><label>每个样本重复次数<select v-model.number="form.repeats"><option :value="1">1 次</option><option :value="2">2 次</option><option :value="3">3 次</option></select></label></div>

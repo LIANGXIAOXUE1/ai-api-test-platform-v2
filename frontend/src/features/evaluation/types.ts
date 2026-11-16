@@ -6,7 +6,7 @@ export type EvaluationSuite = {
 }
 export type BusinessEvaluationRun = {
   id: number; projectId: number; suite: EvaluationSuite; status: string; total: number; completed: number
-  results: any[]; conclusion: string; error?: string; createdAt: string
+  results: any[]; conclusion: string; error?: string; createdBy?: string; createdAt: string
 }
 export function defaultSuite(projectId: number, scenario = 'short_video'): EvaluationSuite {
   const common = { id: 0, projectId, scenario, shotCount: 6, durationSeconds: 30, outputFields: ['customer', 'request', 'priority'], profileIds: [] as number[], judgeProfileId: 0, repeats: 1 }

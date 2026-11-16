@@ -21,7 +21,7 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.yml ps
 ```
 
-- 浏览器平台：[http://127.0.0.1:5177/](http://127.0.0.1:5177/)。本地演示用户 `local`，密码 `local-demo-password-change-me`，可在env修改。
+- 浏览器平台：[http://127.0.0.1:5177/](http://127.0.0.1:5177/)。本地演示用户 `local`，密码 `local-demo-password-change-me`，首次空库可在env设置；已有账号请在平台内修改密码。
 - 云盘文档：[http://127.0.0.1:8082/v3/api-docs](http://127.0.0.1:8082/v3/api-docs)。云盘根路径没有打包前端，不以其404判后端未启动。
 - **项目任务的后台目标用 `http://cloud-disk:8082`**，因为平台后端在容器里。导入组件选择OpenAPI JSON文件，导入前将其servers指向该内部地址。
 - 端口冲突改env里的 `PLATFORM_WEB_PORT` / `CLOUD_DISK_PORT`。不要同时运行云盘仓库的独立Compose。
@@ -30,9 +30,17 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 
 ## 平台登录的用途
 
-在平台内登录页填写 `.env.acceptance` 中的 `PLATFORM_AUTH_USER` / `PLATFORM_AUTH_PASSWORD`。本地样例为 `local` / `local-demo-password-change-me`；正式环境由管理员配置独立账号和密码。
+首次空数据库根据 `PLATFORM_AUTH_USER` / `PLATFORM_AUTH_PASSWORD` 创建管理员，本地样例为 `local` / `local-demo-password-change-me`。已有数据库的账号和密码以数据库为准；修改env或重启不会覆盖已有密码。
 
-当前是单个配置管理员的共享工作台：登录后可以管理该实例的项目、模型池、任务和记录。没有自助注册、独立用户空间或多角色权限；助手的审核/自动执行权限与平台登录分开，也不代表操作系统管理员权限。云盘测试账号在项目测试页另行配置。
+管理员在侧边栏“用户与权限”新增账号、选择角色、分配项目、授权助手自动执行，或禁用账号和重置密码；所有用户可在侧边栏修改自己的密码。账号不开放自助注册。
+
+| 角色 | 可用能力 |
+| --- | --- |
+| 管理员 | 全部项目、用户与操作日志、公共模型池和助手配置；仍受目标地址及测试范围约束 |
+| 测试员 | 获分配项目的接口/用例/任务、手动执行、模型测评和报告；公共模型配置仅查看脱敏元数据 |
+| 只读用户 | 获分配项目的历史与脱敏报告、导出；不能修改、执行或发起模型调用 |
+
+项目成员与助手自动执行是两项授权；测试员默认先审核，管理员可以单独授权自动执行。模型池与助手仍为平台公共资源，项目授权不等于操作系统权限。云盘业务账号在项目测试页另行配置。操作日志记录账号、项目、路径、资源编号和状态，不保存密码或请求体；旧记录可能没有执行人。未分配项目的用户显示空状态。
 
 浏览器使用8小时服务端会话，HttpOnly/SameSite Cookie维持登录，不把密码写入localStorage。侧边栏可退出登录；会话过期或后端重启需重新登录，已保存数据仍保留。非浏览器MCP/CLI继续支持Basic凭据；未登录只能加载登录页和最小健康信息，私有API返回401。关闭标签页不等于退出，需使用退出按钮。
 
@@ -47,12 +55,12 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 结果写 `.runtime/peer-acceptance/<时间-编号>/`，含Markdown和JSON。脚本只用本次创建的数据，不永久删除、不重置数据库。真实模型、页面交互和未覆盖云盘接口另测。
 
 - [测试团队交付清单](docs/测试团队交付清单.md)：统一入口，说明4份配套资料、可选附件、执行顺序和已知问题。
-- [完整同伴验收指南](docs/同伴测试验收文档-2026-11-16.md)：依赖、数据库、71项操作/预期、边界、填写标准。
+- [完整同伴验收指南](docs/同伴测试验收文档-2026-11-16.md)：依赖、数据库、83项操作/预期、边界、填写标准。
 - [同伴实际结果填写表](docs/同伴验收结果填写模板.csv)：空白实际结果，UTF-8 BOM，可用Excel。
 - [直接发给AI的启动与测试提示词](docs/AI运行与测试提示词.md)：双仓库、云盘单独运行、内置助手三段。
 - [本次发布前验证记录](docs/发布前验证记录-2026-11-16.md)：实际通过与未验证项分别记录。
 
-当前为待验收版本：32项既有基础冒烟通过不等于全平台已上线验收。旧测评生成入口、空/部分usage、跨批排队限制仍需收尾；证据原文定位不等于文档引用认证。详见验收指南DOC-Q01～DOC-Q04。本轮更新平台登录页和会话鉴权；上述测评问题仍未修复。
+当前为待验收版本：32项既有基础冒烟通过不等于全平台已上线验收。旧测评生成入口、空/部分usage、跨批排队限制仍需收尾；证据原文定位不等于文档引用认证。详见验收指南DOC-Q01～DOC-Q04。本轮更新平台用户、项目授权和会话鉴权；上述测评问题仍未修复。
 
 ## 两条业务主线
 
@@ -80,6 +88,7 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 frontend/src/main.ts                    现有测试台、模型池和助手入口
 frontend/src/features/project-test/     项目任务配置、执行结果、历史和状态管理
 frontend/src/features/evaluation/       业务场景测评、结果比较
+frontend/src/features/auth/             登录、用户权限、密码与只读报告
 frontend/src/features/shared/           测试导航与共享样式
 backend/cmd/server/                     net/http入口、适配器、运行安全、兼容接口
 backend/internal/projecttest/           任务计划、依赖执行、断言、权限、持久化、报告
