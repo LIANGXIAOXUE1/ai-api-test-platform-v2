@@ -28,7 +28,7 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 - PowerShell快捷启动：`./scripts/start-local.ps1 -RunSmoke`，可用 `-CloudDiskRoot` 指定另一源码路径。
 - 停止保留数据：同一Compose命令改为 `stop`；恢复用 `start`。不要用 `down -v` 清掉历史/密钥。
 
-## 自动冒烟与同伴验收
+## 自动冒烟与测试团队验收
 
 ```sh
 docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.yml --profile checks run --rm smoke
@@ -38,10 +38,13 @@ docker compose --env-file .env.acceptance -f deploy/docker-compose.acceptance.ym
 
 结果写 `.runtime/peer-acceptance/<时间-编号>/`，含Markdown和JSON。脚本只用本次创建的数据，不永久删除、不重置数据库。真实模型、页面交互和未覆盖云盘接口另测。
 
-- [完整同伴验收指南](docs/同伴测试验收文档-2026-11-16.md)：依赖、数据库、59项操作/预期、边界、填写标准。
+- [测试团队交付清单](docs/测试团队交付清单.md)：统一入口，说明4份配套资料、可选附件、执行顺序和已知问题。
+- [完整同伴验收指南](docs/同伴测试验收文档-2026-11-16.md)：依赖、数据库、67项操作/预期、边界、填写标准。
 - [同伴实际结果填写表](docs/同伴验收结果填写模板.csv)：空白实际结果，UTF-8 BOM，可用Excel。
 - [直接发给AI的启动与测试提示词](docs/AI运行与测试提示词.md)：双仓库、云盘单独运行、内置助手三段。
 - [本次发布前验证记录](docs/发布前验证记录-2026-11-16.md)：实际通过与未验证项分别记录。
+
+当前为待验收版本：32项既有基础冒烟通过不等于全平台已上线验收。旧测评生成入口、空/部分usage、跨批排队限制仍需收尾；证据原文定位不等于文档引用认证。详见验收指南DOC-Q01～DOC-Q04。本轮只同步文档，没有修复这些代码问题。
 
 ## 两条业务主线
 
