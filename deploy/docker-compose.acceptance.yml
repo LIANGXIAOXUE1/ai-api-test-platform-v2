@@ -1,0 +1,123 @@
+# Local, reproducible peer acceptance. Clone cloud-disk beside this repository.
+name: pulse-api-acceptance
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: api_test
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD: ${ACCEPTANCE_POSTGRES_PASSWORD:-pulse-local-test}
+    volumes: [acceptance_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U api_user -d api_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${CLOUD_DISK_DB_PASSWORD:-cloud-disk-local-test}
+      MYSQL_DATABASE: private_aggregator
+    volumes:
+      - acceptance_mysql:/var/lib/mysql
+      - type: bind
+        source: ${CLOUD_DISK_SOURCE:-../../cloud-disk}/sql/init.sql
+        target: /docker-entrypoint-initdb.d/01-init.sql
+        read_only: true
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -uroot -e "SELECT 1" private_aggregator >/dev/null 2>&1']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: cloud_local
+      RABBITMQ_DEFAULT_PASS: ${CLOUD_DISK_MQ_PASSWORD:-cloud-mq-local-test}
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  cloud-disk:
+    build:
+      context: ${CLOUD_DISK_SOURCE:-../../cloud-disk}
+      dockerfile: Dockerfile
+    environment:
+      SERVER_PORT: 8082
+      CLOUD_DISK_DB_PASSWORD: ${CLOUD_DISK_DB_PASSWORD:-cloud-disk-local-test}
+      CLOUD_DISK_MQ_PASSWORD: ${CLOUD_DISK_MQ_PASSWORD:-cloud-mq-local-test}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/private_aggregator?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${CLOUD_DISK_DB_PASSWORD:-cloud-disk-local-test}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: cloud_local
+      SPRING_RABBITMQ_PASSWORD: ${CLOUD_DISK_MQ_PASSWORD:-cloud-mq-local-test}
+      CLOUD_DISK_STORAGE_ROOT_PATH: /data/files
+      CLOUD_DISK_AI_API_KEY: ${CLOUD_DISK_AI_API_KEY:-}
+    ports: ["127.0.0.1:${CLOUD_DISK_PORT:-8082}:8082"]
+    volumes: [acceptance_cloud_files:/data/files]
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8082/v3/api-docs >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    environment:
+      APP_ENV: development
+      PORT: 8080
+      LISTEN_HOST: 0.0.0.0
+      POSTGRES_HOST: db:5432
+      POSTGRES_DB: api_test
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD: ${ACCEPTANCE_POSTGRES_PASSWORD:-pulse-local-test}
+      PLATFORM_AUTH_USER: ${PLATFORM_AUTH_USER:-local}
+      PLATFORM_AUTH_PASSWORD: ${PLATFORM_AUTH_PASSWORD:-local-demo-password-change-me}
+      PLATFORM_ALLOWED_TARGETS: ${PLATFORM_ALLOWED_TARGETS:-http://cloud-disk:8082}
+      PLATFORM_ALLOWED_ORIGINS: http://localhost:${PLATFORM_WEB_PORT:-5177},http://127.0.0.1:${PLATFORM_WEB_PORT:-5177}
+      PROJECT_TEST_DATA_DIR: /app/data
+    volumes: [acceptance_platform_keys:/app/data]
+    depends_on:
+      db: {condition: service_healthy}
+      cloud-disk: {condition: service_healthy}
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+      args: {NGINX_CONFIG: nginx.production.conf}
+    ports: ["127.0.0.1:${PLATFORM_WEB_PORT:-5177}:80"]
+    depends_on: [backend]
+  smoke:
+    image: python:3.12-alpine
+    profiles: [checks]
+    working_dir: /workspace
+    environment:
+      PLATFORM_AUTH_USER: ${PLATFORM_AUTH_USER:-local}
+      PLATFORM_AUTH_PASSWORD: ${PLATFORM_AUTH_PASSWORD:-local-demo-password-change-me}
+    volumes:
+      - ../scripts/verify-acceptance.py:/workspace/verify-acceptance.py:ro
+      - ../.runtime/peer-acceptance:/workspace/results
+    command: [python, verify-acceptance.py, --base-url, "http://frontend", --cloud-base, "http://cloud-disk:8082", --cloud-doc-url, "http://cloud-disk:8082/v3/api-docs", --output, results]
+    depends_on: [frontend]
+volumes:
+  acceptance_pg:
+  acceptance_mysql:
+  acceptance_cloud_files:
+  acceptance_platform_keys:

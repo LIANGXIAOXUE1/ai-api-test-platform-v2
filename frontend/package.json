@@ -4,15 +4,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:project-test": "node --test tests/project-test.test.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-vue": "latest",
-    "vite": "latest",
-    "typescript": "latest",
-    "vue": "latest"
+    "@vitejs/plugin-vue": "6.0.10",
+    "vite": "8.3.4",
+    "typescript": "7.0.2",
+    "vue": "3.5.43"
   },
   "devDependencies": {}
 }

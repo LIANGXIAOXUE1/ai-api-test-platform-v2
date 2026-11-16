@@ -1,0 +1,88 @@
+name: pulse-api-production
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      POSTGRES_DB: api_test
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    secrets: [database_password]
+    volumes: [production_db:/var/lib/postgresql/data]
+    networks: [storage]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U api_user -d api_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      APP_ENV: production
+      PORT: 8080
+      LISTEN_HOST: 0.0.0.0
+      POSTGRES_HOST: db:5432
+      POSTGRES_DB: api_test
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+      PLATFORM_AUTH_USER: ${PLATFORM_AUTH_USER:?Please run production setup}
+      PLATFORM_AUTH_PASSWORD_FILE: /run/secrets/platform_password
+      PLATFORM_ALLOWED_ORIGINS: https://${PLATFORM_DOMAIN:?Domain is required}
+      PLATFORM_ALLOWED_TARGETS: ${PLATFORM_ALLOWED_TARGETS:?Target origin list is required}
+      PLATFORM_ALLOW_PUBLIC_TARGETS: "false"
+      PROJECT_TEST_DATA_DIR: /app/data
+    secrets: [database_password, platform_password]
+    volumes:
+      - ${PLATFORM_DATA_DIR:?Data directory is required}:/app/data
+    networks: [storage, app, outbound]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      db: {condition: service_healthy}
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+      args: {NGINX_CONFIG: nginx.production.conf}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    networks: [app]
+    depends_on: [backend]
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [app, outbound]
+    depends_on: [frontend]
+secrets:
+  database_password:
+    file: ${PLATFORM_SECRETS_DIR:?Secret directory is required}/database-password.txt
+  platform_password:
+    file: ${PLATFORM_SECRETS_DIR:?Secret directory is required}/platform-password.txt
+volumes:
+  production_db:
+  caddy_data:
+  caddy_config:
+networks:
+  storage: {internal: true}
+  app: {internal: true}
+  outbound: {}

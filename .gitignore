@@ -8,3 +8,15 @@ backend/.gocache
 frontend/node_modules
 frontend/dist
 .env
+.runtime/
+backend/data/
+docs/KEY.txt
+*.log
+.env.*
+!.env.example
+!.env.*.example
+*.dump
+*.key
+*.pem
+__pycache__/
+*.py[cod]

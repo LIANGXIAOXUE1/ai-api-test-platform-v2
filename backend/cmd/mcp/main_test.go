@@ -49,3 +49,28 @@ func TestMCPHTTPBridgeWrapsToolResult(t *testing.T) {
 		t.Fatalf("工具结果没有按 MCP content 返回：%s", data)
 	}
 }
+
+func TestMCPAuthenticatedBridge(t *testing.T) {
+	t.Setenv("PULSE_API_AUTH_USER", "owner")
+	t.Setenv("PULSE_API_AUTH_PASSWORD", "test-password")
+	t.Setenv("PULSE_API_AUTH_PASSWORD_FILE", "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok || u != "owner" || p != "test-password" {
+			w.WriteHeader(401)
+			return
+		}
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	original := backendURL
+	backendURL = server.URL
+	defer func() { backendURL = original }()
+	if _, err := backendRequest("GET", "/api/projects", nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PULSE_API_AUTH_PASSWORD", "wrong")
+	if _, err := backendRequest("GET", "/api/projects", nil); err == nil {
+		t.Fatal("incorrect credential accepted")
+	}
+}

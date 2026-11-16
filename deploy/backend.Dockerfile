@@ -4,11 +4,12 @@ COPY backend/go.mod ./
 COPY backend/go.sum ./
 COPY backend/vendor ./vendor
 COPY backend/cmd ./cmd
+COPY backend/internal ./internal
 RUN CGO_ENABLED=0 go build -mod=vendor -o /out/api-server ./cmd/server
 
-FROM alpine:3.20
+FROM alpine:3.22
 WORKDIR /app
 COPY --from=build /out/api-server ./api-server
-RUN mkdir -p /app/data
+RUN apk add --no-cache ca-certificates && mkdir -p /app/data
 EXPOSE 8080
 CMD ["./api-server"]

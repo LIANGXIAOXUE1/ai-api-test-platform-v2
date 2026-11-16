@@ -4,3 +4,10 @@ backend/api-server.exe
 backend/api-server-local.exe
 backend/data
 *.log
+.runtime
+docs/KEY.txt
+.env
+.env.*
+*.key
+*.dump
+frontend/dist

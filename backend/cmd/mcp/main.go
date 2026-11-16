@@ -6,6 +6,7 @@ package main
 // 暴露给 WorkBuddy、Cursor、Claude Desktop 等支持 MCP 的客户端。
 
 import (
+	"ai-api-test-platform-v1/backend/internal/security"
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type rpcRequest struct {
@@ -111,6 +113,8 @@ func toolDefinitions() []map[string]any {
 	}
 	return []map[string]any{
 		{"name": "list_apis", "description": "查询 Pulse API 当前项目的接口列表。只读操作。", "inputSchema": object(map[string]any{"projectId": map[string]any{"type": "integer", "description": "项目 ID"}}, []string{"projectId"})},
+		{"name": "import_openapi_file", "description": "从用户明确指定的本地 OpenAPI JSON 文件导入接口。写入项目接口列表，必须显式确认。", "inputSchema": object(map[string]any{"confirm": map[string]any{"type": "boolean"}, "projectId": map[string]any{"type": "integer"}, "filePath": stringField("用户提供的 OpenAPI JSON 绝对路径")}, []string{"confirm", "projectId", "filePath"})},
+		{"name": "run_project_connectivity_check", "description": "生成或执行项目接口联通性巡检。review 只生成审核计划；auto 只执行当前 baseUrl 的无凭证只读接口，不发送 Token、请求体或删除写入操作，并返回 Markdown 报告。", "inputSchema": object(map[string]any{"confirm": map[string]any{"type": "boolean", "description": "自动执行时必须为 true"}, "projectId": map[string]any{"type": "integer"}, "baseUrl": stringField("已启动项目的根地址，例如 http://localhost:8082"), "permission": map[string]any{"type": "string", "enum": []string{"review", "auto"}, "description": "review=人工审核计划，auto=安全自动执行"}}, []string{"projectId", "baseUrl", "permission"})},
 		{"name": "get_api_schema", "description": "读取指定接口的请求方法、URL、Headers、Body 和接口类型。只读操作。", "inputSchema": object(map[string]any{"projectId": map[string]any{"type": "integer"}, "apiId": map[string]any{"type": "integer"}}, []string{"projectId", "apiId"})},
 		{"name": "create_api_draft", "description": "根据自然语言生成新增接口或测试请求草稿，不写数据库、不发送请求。", "inputSchema": object(map[string]any{"projectId": map[string]any{"type": "integer"}, "apiId": map[string]any{"type": "integer", "description": "可选的当前接口 ID"}, "prompt": stringField("用户想完成的接口配置或测试目标")}, []string{"projectId", "prompt"})},
 		{"name": "create_endpoint", "description": "把已确认的接口配置写入 Pulse API。必须显式传 confirm=true。", "inputSchema": object(map[string]any{"confirm": map[string]any{"type": "boolean"}, "projectId": map[string]any{"type": "integer"}, "name": stringField("接口名称"), "method": stringField("GET、POST 等"), "url": stringField("接口 URL"), "kind": stringField("REST、LLM 或 Multimodal"), "headers": map[string]any{"type": "object"}, "query": map[string]any{"type": "object"}, "body": stringField("请求体")}, []string{"confirm", "projectId", "name", "method", "url"})},
@@ -128,6 +132,58 @@ func callTool(name string, args map[string]any) (any, error) {
 			return toolError(err)
 		}
 		result, err := backendRequest(http.MethodGet, fmt.Sprintf("/api/apis?projectId=%d", projectID), nil)
+		if err != nil {
+			return toolError(err)
+		}
+		return toolResult(result), nil
+	case "import_openapi_file":
+		if !confirmed(args) {
+			return toolError(errors.New("导入会写入项目接口列表，请在用户确认后再次调用，并传 confirm=true"))
+		}
+		projectID, err := intArg(args, "projectId")
+		if err != nil {
+			return toolError(err)
+		}
+		filePath, err := stringArg(args, "filePath")
+		if err != nil {
+			return toolError(err)
+		}
+		if !strings.HasSuffix(strings.ToLower(filePath), ".json") {
+			return toolError(errors.New("OpenAPI 文档必须是 .json 文件"))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return toolError(fmt.Errorf("读取 OpenAPI 文件失败：%w", err))
+		}
+		if len(data) > 8<<20 {
+			return toolError(errors.New("OpenAPI 文档不能超过 8MB"))
+		}
+		var spec map[string]any
+		if err := json.Unmarshal(data, &spec); err != nil || spec["paths"] == nil {
+			return toolError(errors.New("文件不是包含 paths 的 OpenAPI JSON 文档"))
+		}
+		result, err := backendRequest(http.MethodPost, "/api/apis/import", map[string]any{"projectId": projectID, "spec": spec})
+		if err != nil {
+			return toolError(err)
+		}
+		return toolResult(result), nil
+	case "run_project_connectivity_check":
+		projectID, err := intArg(args, "projectId")
+		if err != nil {
+			return toolError(err)
+		}
+		baseURL, err := stringArg(args, "baseUrl")
+		if err != nil {
+			return toolError(err)
+		}
+		permission, err := stringArg(args, "permission")
+		if err != nil || (permission != "review" && permission != "auto") {
+			return toolError(errors.New("permission 只能是 review 或 auto"))
+		}
+		if permission == "auto" && !confirmed(args) {
+			return toolError(errors.New("自动巡检会向当前项目发起无凭证只读请求，请在用户确认后再次调用，并传 confirm=true"))
+		}
+		result, err := backendRequest(http.MethodPost, "/api/project-check", map[string]any{"projectId": projectID, "baseUrl": baseURL, "permission": permission, "confirmed": confirmed(args)})
 		if err != nil {
 			return toolError(err)
 		}
@@ -232,7 +288,24 @@ func backendRequest(method, path string, payload any) (any, error) {
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	response, err := (&http.Client{}).Do(req)
+	user := strings.TrimSpace(os.Getenv("PULSE_API_AUTH_USER"))
+	password, err := security.ReadSecret("PULSE_API_AUTH_PASSWORD")
+	if err != nil {
+		return nil, err
+	}
+	if (user == "") != (password == "") {
+		return nil, fmt.Errorf("MCP 平台用户名与密码必须同时配置")
+	}
+	if user != "" {
+		if req.URL.Scheme != "https" && req.URL.Hostname() != "localhost" && req.URL.Hostname() != "127.0.0.1" && req.URL.Hostname() != "::1" {
+			return nil, fmt.Errorf("远程 MCP 平台连接必须使用 HTTPS")
+		}
+		req.SetBasicAuth(user, password)
+	}
+	client := &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(r *http.Request, via []*http.Request) error {
+		return fmt.Errorf("平台地址发生跳转，请配置最终 HTTPS 地址")
+	}}
+	response, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
