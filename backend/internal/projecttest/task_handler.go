@@ -1,6 +1,7 @@
 package projecttest
 
 import (
+	"ai-api-test-platform-v1/backend/internal/reportdoc"
 	"ai-api-test-platform-v1/backend/internal/security"
 	"context"
 	"encoding/base64"
@@ -361,6 +362,16 @@ func (h *TaskHandler) Export(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Query().Get("format") == "json" {
 		writeJSON(w, 200, run)
+		return
+	}
+	if r.URL.Query().Get("format") == "docx" {
+		raw, _ := json.Marshal(run)
+		data, err := reportdoc.Project(raw)
+		if err != nil {
+			taskError(w, err)
+			return
+		}
+		reportdoc.Download(w, fmt.Sprintf("project-test-%d", run.ID), data)
 		return
 	}
 	var b strings.Builder

@@ -4,9 +4,10 @@ const { readOnly, canAuto, isAdmin } = usePermissions()
 import { computed, nextTick, ref, watch } from 'vue'
 import '../shared/business-testing.css'
 type Run = { id: number; caseId: number; caseName: string; createdBy?: string; startedAt: string; statusCode: number; durationMs: number; success: boolean; errorCategory: string }
-type Case = { id: number }
+type Case = { id: number; name: string }
 type Difference = { hasBaseline?: boolean; runCount?: number; baseline?: Run; latest?: Run; diff?: { message: string; changes?: { path: string; message: string }[] }[] }
 const props = defineProps<{ runs: Run[]; cases: Case[]; detail: Difference | null; activeTab: 'history' | 'regression'; busy: boolean }>()
+const unexecutedCases = computed(() => props.cases.filter(item => !props.runs.some(run => run.caseId === item.id)))
 const emit = defineEmits<{ 'update:activeTab': [value: 'history' | 'regression']; create: []; view: [run: Run]; replay: [run: Run]; compare: [run: Run]; 'replay-compare': [run: Run]; edit: [id: number] }>()
 const latestCases = computed(() => {
   const latest = new Map<number, Run>()
@@ -36,6 +37,7 @@ watch(() => props.detail, async detail => {
       <p v-if="!runs.length" class="bt-hint">暂无执行记录，发送测试请求后自动保存。</p>
     </section>
     <template v-else>
+      <section v-if="unexecutedCases.length" class="bt-section"><h2>尚未执行的保存用例</h2><p class="bt-hint">包含知识库生成后保存的用例。载入测试台会保留生成的请求和断言，补齐环境变量后即可执行。</p><div v-for="item in unexecutedCases" :key="item.id" class="bt-record"><div><b>{{ item.name }}</b><small>用例 #{{ item.id }} · 未执行</small></div><button v-if="!readOnly" class="send-only" :disabled="busy" @click="emit('edit',item.id)">载入测试台</button></div></section>
       <p class="bt-hint">每个保存用例显示最近一次结果。“查看差异”读取已有记录；“重新执行并比较”会发送新请求。</p>
       <section class="bt-section"><div class="bt-table-wrap"><table class="bt-table"><thead><tr><th>保存用例</th><th>最近结果</th><th>状态码</th><th>耗时</th><th>操作</th></tr></thead><tbody><tr v-for="item in latestCases" :key="item.caseId"><td><b>{{ item.caseName }}</b><small>用例 #{{ item.caseId }}</small></td><td><span class="bt-status" :class="item.success?'passed':'failed'">{{ item.success?'通过':'失败' }}</span></td><td>{{ item.statusCode || 'ERR' }}</td><td>{{ item.durationMs }} ms</td><td class="records-operations"><button class="link-btn" :disabled="busy" @click="emit('compare',item)">查看差异</button><button class="link-btn" :disabled="busy" v-if="!readOnly" @click="emit('replay-compare',item)">重新执行并比较</button></td></tr></tbody></table></div><p v-if="!latestCases.length" class="bt-hint">先在测试台“发送并保存”，再从这里重用测试用例。</p></section>
       <section v-if="detail" ref="differencePanel" class="bt-section bt-detail records-difference" aria-live="polite"><div class="bt-heading"><h2>前后结果差异<span v-if="detail.latest"> · {{ detail.latest.caseName }}</span></h2><span class="bt-status" :class="detail.hasBaseline===false || detail.diff?.length?'blocked':'passed'">{{ detail.hasBaseline===false?'尚无对比基线':detail.diff?.length?'发现变化':'没有明显变化' }}</span></div>

@@ -17,7 +17,7 @@ type evaluationGateway struct{ s *server }
 
 func (g evaluationGateway) Candidate(ctx context.Context, id int) (evaluation.Candidate, error) {
 	p, ok := g.s.store.modelProfileByID(ctx, 0, id)
-	if !ok || !p.Enabled {
+	if !ok || !p.Enabled || !p.Verified {
 		return evaluation.Candidate{}, fmt.Errorf("模型配置不可用")
 	}
 	return evaluation.Candidate{ID: p.ID, Name: p.Name, Provider: p.Provider, Deployment: p.Model}, nil
@@ -31,7 +31,7 @@ func (g evaluationGateway) DefaultJudge(ctx context.Context) (int, error) {
 }
 func (g evaluationGateway) Complete(ctx context.Context, id int, system, user string) (evaluation.Completion, error) {
 	p, ok := g.s.store.modelProfileByID(ctx, 0, id)
-	if !ok || !p.Enabled {
+	if !ok || !p.Enabled || !p.Verified {
 		return evaluation.Completion{}, fmt.Errorf("模型配置不可用")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 75*time.Second)

@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"ai-api-test-platform-v1/backend/internal/reportdoc"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,6 +29,31 @@ func Register(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("/api/evaluation-suites/runs", h.Runs)
 	mux.HandleFunc("/api/evaluation-suites/cancel", h.Cancel)
 	mux.HandleFunc("/api/evaluation-suites/review", h.Review)
+	mux.HandleFunc("/api/evaluation-suites/export", h.Export)
+}
+
+func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		reply(w, 405, map[string]string{"error": "method not allowed"})
+		return
+	}
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	run, err := h.store.Run(r.Context(), project(r), id)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if r.URL.Query().Get("format") != "docx" {
+		reply(w, 200, run)
+		return
+	}
+	raw, _ := json.Marshal(run)
+	data, err := reportdoc.Evaluation(raw)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reportdoc.Download(w, fmt.Sprintf("evaluation-%d", run.ID), data)
 }
 func reply(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

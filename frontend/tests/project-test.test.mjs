@@ -5,7 +5,7 @@ import { ref } from 'vue'
 
 const server = await createServer({
   configFile: false,
-  server: { middlewareMode: true },
+  server: { middlewareMode: true, hmr:false },
   appType: 'custom',
   logLevel: 'error',
 })

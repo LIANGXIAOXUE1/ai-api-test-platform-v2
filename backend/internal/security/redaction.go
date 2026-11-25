@@ -6,7 +6,7 @@ import (
 )
 
 var secretField = regexp.MustCompile(`(?i)(^|[._-])(password|passwd|secret|token|authorization|cookie)([._-]|$)|^(api[-_]?key|apiKeyMasked|accessToken|refreshToken|authToken|cloudDiskToken|cloud_disk_token|passwordHash|currentPassword)$`)
-var privateField = regexp.MustCompile(`(?i)^(request|response|requestBody|responseBody|body|requestHeaders|responseHeaders|headers|variables|initialVariables|extracted|fileData|private|markdown)$`)
+var privateField = regexp.MustCompile(`(?i)^(request|response|requestBody|responseBody|body|content|requestHeaders|responseHeaders|headers|variables|initialVariables|extracted|fileData|private|markdown)$`)
 
 // View-only users receive checks, state and timing, never raw requests or
 // responses that may contain arbitrary credentials. No keyword guess promises

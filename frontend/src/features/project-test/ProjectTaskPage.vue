@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { downloadWord } from '../shared/download'
 import { usePermissions } from '../auth/usePermissions'
 const { readOnly, canAuto, isAdmin } = usePermissions()
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
@@ -108,6 +109,10 @@ async function openapi(event: Event) {
 }
 async function stop() { try { if (activeRun.value) await api('cancel', post({ projectId: props.projectId, id: activeRun.value.id })) } catch (e) { error.value = (e as Error).message } }
 async function download(format: string) {
+  if (format === 'docx' && activeRun.value) {
+    try { await downloadWord('/api/project-tests/export?projectId=' + props.projectId + '&id=' + activeRun.value.id + '&format=docx', '项目测试验收报告-' + activeRun.value.id + '.docx') } catch (e) { error.value = (e as Error).message }
+    return
+  }
   if (!activeRun.value) return
   try {
     const response = await fetch('/api/project-tests/export?projectId=' + props.projectId + '&id=' + activeRun.value.id + '&format=' + format)

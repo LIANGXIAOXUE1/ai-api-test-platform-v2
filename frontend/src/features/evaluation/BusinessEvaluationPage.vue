@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { usePermissions } from '../auth/usePermissions'
 const { readOnly, canAuto, isAdmin } = usePermissions()
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { verifiedModels, eligibleSelection } from '../shared/models'
+import { downloadWord } from '../shared/download'
 import { defaultSuite, type EvaluationSuite, type BusinessEvaluationRun } from './types'
 import EvaluationComparison from './EvaluationComparison.vue'
 import '../shared/business-testing.css'
 const props = defineProps<{ projectId: number; profiles: any[]; request: (path: string, options?: RequestInit) => Promise<any> }>()
 const emit = defineEmits<{ 'add-model': [] }>()
 const form = ref(defaultSuite(props.projectId))
+const availableProfiles = computed(() => verifiedModels(props.profiles))
+function syncModels() {
+  form.value.profileIds = eligibleSelection(form.value.profileIds, props.profiles)
+  if (form.value.judgeProfileId && !availableProfiles.value.some(model => model.id === form.value.judgeProfileId)) form.value.judgeProfileId = 0
+}
+watch(() => props.profiles, syncModels, { deep:true })
 const suites = ref<EvaluationSuite[]>([])
 const runs = ref<BusinessEvaluationRun[]>([])
 const legacy = ref<any[]>([])
@@ -51,7 +59,7 @@ async function poll() {
   } catch (e) { error.value = (e as Error).message; timer = setTimeout(poll, 2500) }
 }
 function open(run: BusinessEvaluationRun) { clearTimeout(timer); activeRun.value = run; tab.value = 'result'; legacyReport.value = null; poll() }
-function edit(suite: EvaluationSuite) { form.value = JSON.parse(JSON.stringify(suite)); tab.value = readOnly.value ? 'history' : 'setup' }
+function edit(suite: EvaluationSuite) { form.value = JSON.parse(JSON.stringify(suite)); syncModels(); tab.value = readOnly.value ? 'history' : 'setup' }
 async function upload(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return
   if (file.size > 1024 * 1024) { error.value = '业务资料最多 1 MB 文本。'; return }
@@ -62,9 +70,13 @@ async function review(value: any) {
   if (!activeRun.value) return
   try { activeRun.value = await api('/review', post({ ...value, id: activeRun.value.id, projectId: props.projectId })); await load(); notice.value = '复核已保存为新报告版本。' } catch (e) { error.value = (e as Error).message }
 }
-function download(format: string) {
+async function download(format: string) {
   if (!activeRun.value) return
   const run = activeRun.value
+  if (format === 'docx') {
+    try { await downloadWord('/api/evaluation-suites/export?projectId=' + props.projectId + '&id=' + run.id + '&format=docx', '模型测评分析报告-' + run.id + '.docx'); notice.value = 'Word 报告已开始下载，请查看浏览器下载列表。' } catch (e) { error.value = (e as Error).message }
+    return
+  }
   const lines = ['# ' + run.suite.name, '', '客户目标：' + run.suite.goal, '资料：' + run.suite.facts, '要求：' + run.suite.requirements, '', '结论：' + run.conclusion, '']
   for (const result of run.results) {
     lines.push('## ' + result.profile.name + ' / ' + result.sample.name, '部署名：' + result.profile.deployment, '耗时：' + result.durationMs + 'ms；Token：' + result.inputTokens + '/' + result.outputTokens + '（' + result.usageSource + '）', result.error || result.answer)
@@ -95,9 +107,10 @@ onBeforeUnmount(() => clearTimeout(timer))
       </section>
       <section class="bt-section">
         <div class="bt-heading"><h2>候选模型与评审来源</h2><button class="link-btn" v-if="isAdmin" @click="emit('add-model')">添加模型</button></div>
-        <div class="bt-checks"><label v-for="profile in profiles.filter(item=>item.enabled)" :key="profile.id"><input v-model="form.profileIds" type="checkbox" :value="profile.id"><span>{{ profile.name }}<small>{{ profile.provider }} · {{ profile.model }}</small></span></label></div>
-        <p v-if="!profiles.length" class="bt-hint">请先添加真实文本模型，密钥在模型池中填写。</p>
-        <div class="bt-fields"><label>语义评审模型<select v-model.number="form.judgeProfileId"><option :value="0">使用当前助手模型；不可用时保留待复核</option><option v-for="profile in profiles.filter(item=>item.enabled)" :key="profile.id" :value="profile.id">{{ profile.name }} · {{ profile.model }}</option></select></label><label>每个样本重复次数<select v-model.number="form.repeats"><option :value="1">1 次</option><option :value="2">2 次</option><option :value="3">3 次</option></select></label></div>
+        <div class="bt-checks"><label v-for="profile in availableProfiles" :key="profile.id"><input v-model="form.profileIds" type="checkbox" :value="profile.id"><span>{{ profile.name }}<small>{{ profile.provider }} · {{ profile.model }}</small></span></label></div>
+        <p class="bt-hint">仅显示已启用且验证通过的模型；未验证或验证失败的配置可在模型池中修正后重新验证。</p>
+        <p v-if="!availableProfiles.length" class="bt-hint">暂无验证通过的候选模型。请先在模型池测试连接。</p>
+        <div class="bt-fields"><label>语义评审模型<select v-model.number="form.judgeProfileId"><option :value="0">使用当前助手模型；不可用时保留待复核</option><option v-for="profile in availableProfiles" :key="profile.id" :value="profile.id">{{ profile.name }} · {{ profile.model }}</option></select></label><label>每个样本重复次数<select v-model.number="form.repeats"><option :value="1">1 次</option><option :value="2">2 次</option><option :value="3">3 次</option></select></label></div>
         <p class="bt-hint">格式和数量由程序核对；事实和业务要求由模型辅助评价，证据可查看并人工复核。建议选择不同于候选的评审模型。</p>
       </section>
       <section class="bt-section">

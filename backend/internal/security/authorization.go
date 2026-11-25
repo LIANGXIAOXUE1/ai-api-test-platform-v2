@@ -1,6 +1,7 @@
 package security
 
 import (
+	"ai-api-test-platform-v1/backend/internal/reportdoc"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -138,7 +139,7 @@ func readPayload(r *http.Request) (map[string]any, error) {
 // encoding/json matches struct fields case-insensitively. Apply that same
 // interpretation before authorization, rejecting ambiguous duplicate aliases.
 func canonicalFields(payload map[string]any) error {
-	for _, canonical := range []string{"projectId", "apiId", "caseId", "taskId", "sourceRunId", "id", "profileIds", "documentIds", "selectedDocumentIds", "selectedProfileIds", "judgeProfileId", "permission", "confirmed", "items", "steps"} {
+	for _, canonical := range []string{"projectId", "apiId", "caseId", "taskId", "sourceRunId", "id", "profileId", "profileIds", "documentIds", "selectedDocumentIds", "selectedProfileIds", "judgeProfileId", "permission", "confirmed", "items", "steps"} {
 		keys := []string{}
 		for key := range payload {
 			if strings.EqualFold(key, canonical) {
@@ -276,6 +277,9 @@ func (a *Access) authorize(r *http.Request, user User) (int, error) {
 	if err = resolve("model", payload["judgeProfileId"]); err != nil {
 		return 0, err
 	}
+	if err = resolve("model", payload["profileId"]); err != nil {
+		return 0, err
+	}
 	if steps, ok := payload["steps"].([]any); ok && r.URL.Path == "/api/runs/chain" {
 		for _, raw := range steps {
 			step, ok := raw.(map[string]any)
@@ -403,6 +407,7 @@ func (a *Access) serveAuthorized(next http.Handler, w http.ResponseWriter, r *ht
 		return
 	}
 	// Exports for viewers use the same sanitized data as on-screen results.
+	docx := user.Role == RoleViewer && strings.HasSuffix(r.URL.Path, "/export") && r.URL.Query().Get("format") == "docx"
 	markdown := user.Role == RoleViewer && strings.HasSuffix(r.URL.Path, "/export") && r.URL.Query().Get("format") != "json"
 	if markdown {
 		q := r.URL.Query()
@@ -467,6 +472,20 @@ func (a *Access) serveAuthorized(next http.Handler, w http.ResponseWriter, r *ht
 			continue
 		}
 		w.Header()[key] = values
+	}
+	if docx && b.status < 300 {
+		var err error
+		if strings.HasPrefix(r.URL.Path, "/api/evaluation-suites/") {
+			data, err = reportdoc.Evaluation(data)
+		} else {
+			data, err = reportdoc.Project(data)
+		}
+		if err != nil {
+			authJSON(w, 500, map[string]string{"error": "报告生成失败"})
+			return
+		}
+		reportdoc.Download(w, "readonly-report", data)
+		return
 	}
 	if markdown && b.status < 300 {
 		pretty, _ := json.MarshalIndent(value, "", "  ")

@@ -1,0 +1,19 @@
+/* The assistant page has three permanent regions. Its controls belong to the
+   composer so optional review content cannot displace them into a grid track. */
+.assistant-window.assistant-chat-page { grid-template-rows:auto minmax(0,1fr) auto auto; }
+.assistant-chat-page .assistant-window-head { min-height:72px; padding:12px clamp(18px,6vw,96px) !important; align-items:center; }
+.assistant-chat-page .assistant-window-head h2 { color:#173c48; font-size:19px !important; line-height:1.35 !important; }
+.assistant-chat-page .assistant-window-head p { color:#49636b; font-size:12px !important; }
+.assistant-chat-page .assistant-messages { min-height:0; max-height:none; padding:24px clamp(18px,6vw,96px); }
+.assistant-chat-page .assistant-message { gap:14px; }
+.assistant-chat-page .assistant-message p { max-width:75ch; color:#173c48; font-size:14px; line-height:1.65; padding:15px 18px; }
+.assistant-chat-page .assistant-message.user p { color:#173c48; }
+.assistant-chat-page .assistant-window-foot { min-height:52px; padding:10px clamp(18px,6vw,96px); }
+.assistant-chat-page .assistant-window-foot>span { max-width:none; overflow:visible; white-space:normal; color:#49636b; font-size:12px; }
+@media(max-width:760px) {
+  .assistant-chat-page .assistant-window-head { padding:10px 16px !important; min-height:64px; }
+  .assistant-chat-page .assistant-window-head h2 { font-size:18px !important; }
+  .assistant-chat-page .assistant-messages { padding:18px 16px; }
+  .assistant-chat-page .assistant-message p { padding:12px 14px; }
+  .assistant-chat-page .assistant-window-foot { padding:10px 16px; }
+}
