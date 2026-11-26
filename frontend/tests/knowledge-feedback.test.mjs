@@ -23,3 +23,7 @@ test('upload API reasons survive the frontend error wrapper',()=>{
  const feedback=knowledgeRequestError(Object.assign(new Error('upload failed'),{details:{message:'文件超过12MB',missingInformation:['文件太大'],nextSteps:['拆分后上传']}}),'upload')
  assert.match(feedback.title,/文档上传失败.*12MB/);assert.deepEqual(feedback.nextSteps,['拆分后上传'])
 })
+test('provider timeouts have a concise reason and retry instructions',()=>{
+ const feedback=knowledgeRequestError(new Error('Post /chat/completions: Client.Timeout exceeded while awaiting headers'),'generation')
+ assert.equal(feedback.title,'测试用例生成失败：模型服务响应超时');assert.match(feedback.nextSteps.join(''),/重新生成/)
+})

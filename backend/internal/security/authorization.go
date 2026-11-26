@@ -56,6 +56,11 @@ func routeCapability(path, method string) string {
 			return "read"
 		}
 		return "edit"
+	case "/api/knowledge/history":
+		if method == "GET" {
+			return "read"
+		}
+		return "deny"
 	case "/api/runs", "/api/project-tests/runs", "/api/evaluation-suites/runs":
 		if method == "GET" {
 			return "read"

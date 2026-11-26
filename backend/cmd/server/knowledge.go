@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"sort"
@@ -277,7 +278,11 @@ func (s *server) businessCases(w http.ResponseWriter, r *http.Request) {
 		result.MissingInformation = []string{}
 	}
 	status, code, message, steps, ready, drafts := knowledgeGenerationFeedback(result)
-	writeJSON(w, 200, map[string]any{"status": status, "code": code, "message": message, "phase": "generation", "source": "llm-project-context", "documents": evidence, "cases": result.Cases, "missingInformation": result.MissingInformation, "nextSteps": steps, "mode": input.Mode, "readyCount": ready, "draftCount": drafts, "documentAssessment": result.DocumentAssessment})
+	history, historyErr := s.store.addKnowledgeGenerationHistory(r.Context(), input, result, evidence, knowledgeHistoryStatus(result))
+	if historyErr != nil {
+		log.Printf("knowledge generation history persistence failed (project=%d): %v", input.ProjectID, historyErr)
+	}
+	writeJSON(w, 200, map[string]any{"status": status, "code": code, "message": message, "phase": "generation", "source": "llm-project-context", "documents": evidence, "cases": result.Cases, "missingInformation": result.MissingInformation, "nextSteps": steps, "mode": input.Mode, "readyCount": ready, "draftCount": drafts, "documentAssessment": result.DocumentAssessment, "historyId": history.ID, "historySaved": historyErr == nil})
 }
 
 func redactHeaderValues(headers map[string]string) map[string]string {

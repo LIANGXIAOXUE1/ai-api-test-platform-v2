@@ -16,6 +16,7 @@ export function generationFeedback(result:any):KnowledgeFeedback|null {
 export function knowledgeRequestError(error:any,phase:KnowledgeFeedback['phase']):KnowledgeFeedback {
   const data=error?.details || {}
   let message=data.message || data.error || error?.message || '请求未完成'
+  if(phase==='generation'&&/Client\.Timeout|Timeout exceeded|timed?\s*out|deadline exceeded/i.test(message))return {title:'测试用例生成失败：模型服务响应超时',reasons:['本次模型调用未完成，尚未生成用例；已上传的资料仍可继续使用。'],nextSteps:['重新生成，或切换另一已验证模型后重试','检查模型服务连接和网关响应情况'],severity:'error',phase}
   if (/Failed to fetch|NetworkError|fetch failed/i.test(message)) message='无法连接平台服务，请检查服务运行状态后重试'
   const prefix=phase==='upload'?'文档上传失败':phase==='save'?'用例保存失败':'测试用例生成失败'
   return {title:prefix+'：'+message,reasons:strings(data.missingInformation),nextSteps:strings(data.nextSteps).length ? strings(data.nextSteps) : [phase==='upload'?'确认文件格式与内容后重新上传':'检查文档、接口范围与模型连接后重试'],severity:'error',phase}

@@ -255,6 +255,22 @@ CREATE TABLE IF NOT EXISTS project_documents (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_project_documents_project_id ON project_documents(project_id);
+CREATE TABLE IF NOT EXISTS knowledge_generation_history (
+  id BIGSERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  api_id INTEGER NOT NULL DEFAULT 0,
+  profile_id INTEGER NOT NULL DEFAULT 0,
+  prompt TEXT NOT NULL DEFAULT '',
+  supplement TEXT NOT NULL DEFAULT '',
+  mode TEXT NOT NULL DEFAULT 'design',
+  document_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  document_names JSONB NOT NULL DEFAULT '[]'::jsonb,
+  cases JSONB NOT NULL DEFAULT '[]'::jsonb,
+  missing_information JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'needs_attention',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_generation_history_project_created ON knowledge_generation_history(project_id, created_at DESC, id DESC);
 CREATE TABLE IF NOT EXISTS model_profiles (
   id SERIAL PRIMARY KEY,
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -1088,6 +1104,7 @@ func main() {
 	mux.HandleFunc("/api/models/import", s.importDiscoveredModels)
 	mux.HandleFunc("/api/models/verify", s.verifyModelProfile)
 	mux.HandleFunc("/api/agent/business-cases", s.businessCases)
+	mux.HandleFunc("/api/knowledge/history", s.knowledgeHistory)
 	mux.HandleFunc("/api/evaluations", s.evaluationsHandler)
 	mux.HandleFunc("/api/evaluations/run", s.evaluationRun)
 	mux.HandleFunc("/api/agent/audit", s.agentAudit)
@@ -1210,6 +1227,7 @@ func (s *server) apis(w http.ResponseWriter, r *http.Request) {
 
 type openAPIImportInput struct {
 	ProjectID int             `json:"projectId"`
+	BaseURL   string          `json:"baseUrl"`
 	Spec      json.RawMessage `json:"spec"`
 }
 
@@ -1233,11 +1251,14 @@ func (s *server) importOpenAPI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "OpenAPI 文档缺少可解析的 paths"})
 		return
 	}
+	var sourceDocument map[string]any
+	_ = json.Unmarshal(input.Spec, &sourceDocument)
 	allowed := map[string]bool{"get": true, "head": true, "options": true, "post": true, "put": true, "delete": true, "patch": true}
-	serverURL := ""
+	fallbackServerURL := ""
 	if len(document.Servers) > 0 {
-		serverURL = strings.TrimRight(strings.TrimSpace(document.Servers[0].URL), "/")
+		fallbackServerURL = document.Servers[0].URL
 	}
+	serverURL := openAPIBaseURL(input.BaseURL, fallbackServerURL)
 	created := []Endpoint{}
 	for path, operations := range document.Paths {
 		for method, rawOperation := range operations {
@@ -1260,6 +1281,10 @@ func (s *server) importOpenAPI(w http.ResponseWriter, r *http.Request) {
 			}
 			var operationSchema map[string]any
 			_ = json.Unmarshal(rawOperation, &operationSchema)
+			if operationSchema == nil {
+				operationSchema = map[string]any{}
+			}
+			operationSchema = openAPIDocumentationSchema(sourceDocument, path, operationSchema)
 			endpointURL := path
 			if serverURL != "" && strings.HasPrefix(path, "/") {
 				endpointURL = serverURL + path
